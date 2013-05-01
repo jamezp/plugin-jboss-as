@@ -23,45 +23,17 @@
 package org.jboss.as.forge;
 
 import java.io.File;
-import javax.enterprise.context.Dependent;
-import javax.enterprise.event.Observes;
+import javax.annotation.PostConstruct;
 import javax.inject.Inject;
 
 import org.jboss.as.forge.util.Files;
 import org.jboss.forge.env.Configuration;
 import org.jboss.forge.env.ConfigurationScope;
-import org.jboss.forge.shell.events.ProjectChanged;
 
 /**
  * @author <a href="mailto:jperkins@redhat.com">James R. Perkins</a>
  */
-@Dependent
 public class ProjectConfiguration {
-
-    private static final String AS7 = "as7";
-    private static final String BUNDLES_DIR = generateKey(AS7, "bundles-dir");
-    private static final String HOSTNAME = generateKey(AS7, "hostname");
-    private static final String JAVA_HOME = generateKey("java-home");
-    private static final String JBOSS_HOME = generateKey(AS7, "jboss-home");
-    private static final String JBOSS_AS_VERSION = generateKey(AS7, "version");
-    private static final String JVM_ARGS = generateKey(AS7, "jvm-args");
-    private static final String MODULES_DIR = generateKey(AS7, "modules-dir");
-    private static final String PORT = generateKey(AS7, "port");
-    private static final String SERVER_CONFIG_FILE = generateKey(AS7, "server-config");
-    private static final String SERVER_STARTUP_TIMEOUT = generateKey(AS7, "timeout");
-    private static final String BASE = "jboss-as";
-
-    private static final String[] KEYS = {
-            BUNDLES_DIR,
-            HOSTNAME,
-            JAVA_HOME,
-            JBOSS_HOME,
-            JBOSS_AS_VERSION,
-            JVM_ARGS,
-            PORT,
-            SERVER_CONFIG_FILE,
-            SERVER_STARTUP_TIMEOUT,
-    };
 
     /**
      * The default JBOSS_HOME key
@@ -102,14 +74,13 @@ public class ProjectConfiguration {
 
     private int port;
 
+    @PostConstruct
     protected void resetDefaults() {
-        hostname = getConfiguration().getString(HOSTNAME, DEFAULT_HOSTNAME);
-        port = getConfiguration().getInt(PORT, DEFAULT_PORT);
-    }
-
-    protected void resetDefaults(@Observes final ProjectChanged event) {
-        if (event.getNewProject() != null) {
-            resetDefaults();
+        try {
+            hostname = getProperty(PropertyKey.HOSTNAME, DEFAULT_HOSTNAME);
+            port = getInt(PropertyKey.PORT, DEFAULT_PORT);
+        } catch (Exception ignore) {
+            // project may not be set up yet
         }
     }
 
@@ -118,8 +89,8 @@ public class ProjectConfiguration {
      */
     protected void clearConfig() {
         final Configuration configuration = getConfiguration();
-        for (String key : KEYS) {
-            configuration.clearProperty(key);
+        for (PropertyKey key : PropertyKey.values()) {
+            configuration.clearProperty(key.key);
         }
         hostname = DEFAULT_HOSTNAME;
         port = DEFAULT_PORT;
@@ -143,12 +114,12 @@ public class ProjectConfiguration {
     protected void setHostname(final String hostname, final boolean persist) {
         this.hostname = hostname;
         if (persist) {
-            setProperty(HOSTNAME, hostname, true);
+            setProperty(PropertyKey.HOSTNAME, hostname);
         }
     }
 
     protected void clearHostname() {
-        setProperty(HOSTNAME, null, true);
+        clearProperty(PropertyKey.HOSTNAME);
         hostname = DEFAULT_HOSTNAME;
     }
 
@@ -170,12 +141,12 @@ public class ProjectConfiguration {
     protected void setPort(final int port, final boolean persist) {
         this.port = port;
         if (persist) {
-            setProperty(PORT, port, true);
+            setProperty(PropertyKey.PORT, port);
         }
     }
 
     protected void clearPort() {
-        setProperty(PORT, null, true);
+        clearProperty(PropertyKey.PORT);
         this.port = DEFAULT_PORT;
     }
 
@@ -187,10 +158,9 @@ public class ProjectConfiguration {
      * @return the JBoss home directory.
      */
     public File getJbossHome() {
-        final Configuration configuration = getConfiguration();
-        if (configuration.containsKey(JBOSS_HOME)) {
+        if (hasProperty(PropertyKey.JBOSS_HOME)) {
             // Get the JBoss Home
-            final String jbossHome = getConfiguration().getString(JBOSS_HOME);
+            final String jbossHome = getProperty(PropertyKey.JBOSS_HOME);
             if (JBOSS_HOME_HOLDER.equals(jbossHome)) {
                 final File tempDir = new File(DEFAULT_JBOSS_HOME, getVersion().getArchiveDir());
                 if (!tempDir.exists()) {
@@ -205,11 +175,11 @@ public class ProjectConfiguration {
     }
 
     protected void setJbossHome(final File jbossHome) {
-        setProperty(JBOSS_HOME, jbossHome);
+        setProperty(PropertyKey.JBOSS_HOME, jbossHome);
     }
 
     protected void setDefaultJbossHomeJbossHome() {
-        setProperty(JBOSS_HOME, JBOSS_HOME_HOLDER, true);
+        setProperty(PropertyKey.JBOSS_HOME, JBOSS_HOME_HOLDER);
     }
 
     /**
@@ -220,11 +190,11 @@ public class ProjectConfiguration {
      * @return the modules directory
      */
     public File getModulesDir() {
-        return getFileResource(MODULES_DIR);
+        return getFileResource(PropertyKey.MODULES_DIR);
     }
 
     protected void setModulesDir(final File modulesDir) {
-        setProperty(MODULES_DIR, modulesDir);
+        setProperty(PropertyKey.MODULES_DIR, modulesDir);
     }
 
     /**
@@ -235,11 +205,11 @@ public class ProjectConfiguration {
      * @return the bundles directory
      */
     public File getBundlesDir() {
-        return getFileResource(BUNDLES_DIR);
+        return getFileResource(PropertyKey.BUNDLES_DIR);
     }
 
     protected void setBundlesDir(final File bundlesDir) {
-        setProperty(BUNDLES_DIR, bundlesDir.getAbsolutePath(), true);
+        setProperty(PropertyKey.BUNDLES_DIR, bundlesDir.getAbsolutePath());
     }
 
     /**
@@ -248,12 +218,11 @@ public class ProjectConfiguration {
      * @return the JVM arguments or {@code null} if there are none set
      */
     public String[] getJvmArgs() {
-        final Configuration configuration = getConfiguration();
-        return configuration.containsKey(JVM_ARGS) ? configuration.getStringArray(JVM_ARGS) : null;
+        return hasProperty(PropertyKey.JVM_ARGS) ? getStringArray(PropertyKey.JVM_ARGS) : null;
     }
 
     protected void setJvmArgs(final String[] args) {
-        setProperty(JVM_ARGS, args, true);
+        setProperty(PropertyKey.JVM_ARGS, args);
     }
 
     /**
@@ -265,11 +234,11 @@ public class ProjectConfiguration {
      * @return the Java home directory
      */
     public String getJavaHome() {
-        return getConfiguration().getString(JAVA_HOME, System.getenv("JAVA_HOME"));
+        return getProperty(PropertyKey.JAVA_HOME, System.getenv("JAVA_HOME"));
     }
 
     protected void setJavaHome(final String javaHome) {
-        setProperty(JAVA_HOME, javaHome, true);
+        setProperty(PropertyKey.JAVA_HOME, javaHome);
     }
 
     /**
@@ -278,11 +247,11 @@ public class ProjectConfiguration {
      * @return the server configuration file or {@code null}
      */
     public String getServerConfigFile() {
-        return getConfiguration().getString(SERVER_CONFIG_FILE, null);
+        return getProperty(PropertyKey.SERVER_CONFIG_FILE, null);
     }
 
     protected void setServerConfigFile(final String path) {
-        setProperty(SERVER_CONFIG_FILE, path, true);
+        setProperty(PropertyKey.SERVER_CONFIG_FILE, path);
     }
 
     /**
@@ -293,11 +262,11 @@ public class ProjectConfiguration {
      * @return the timeout
      */
     public long getStartupTimeout() {
-        return getConfiguration().getLong(SERVER_STARTUP_TIMEOUT, 60L);
+        return getLong(PropertyKey.SERVER_STARTUP_TIMEOUT, 60L);
     }
 
     protected void setStartupTimeout(final long timeout) {
-        setProperty(SERVER_STARTUP_TIMEOUT, timeout, true);
+        setProperty(PropertyKey.SERVER_STARTUP_TIMEOUT, timeout);
     }
 
     /**
@@ -308,65 +277,65 @@ public class ProjectConfiguration {
      * @return the version of the JBoss Application Server to use
      */
     public Version getVersion() {
-        final Configuration configuration = getConfiguration();
-        return configuration.containsKey(JBOSS_AS_VERSION) ?
-                versions.fromString(configuration.getString(JBOSS_AS_VERSION)) :
+        return hasProperty(PropertyKey.JBOSS_AS_VERSION) ?
+                versions.fromString(getProperty(PropertyKey.JBOSS_AS_VERSION)) :
                 versions.defaultVersion();
     }
 
     public void setVersion(final Version version) {
-        setProperty(JBOSS_AS_VERSION, version.toString(), true);
+        setProperty(PropertyKey.JBOSS_AS_VERSION, version.toString());
     }
 
-    boolean hasProperty(final String key) {
-        final String propertyKey = generateKey(AS7, key);
+    boolean hasProperty(final PropertyKey key) {
         try {
-            return getConfiguration().containsKey(propertyKey);
+            return getConfiguration().containsKey(key.key);
         } catch (Exception ignore) {
         }
         return false;
     }
 
-    String getProperty(final String key) {
-        final String propertyKey = generateKey(AS7, key);
-        return getConfiguration().getString(propertyKey);
+    String getProperty(final PropertyKey key) {
+        return getConfiguration().getString(key.key);
     }
 
-    void setProperty(final String key, final String value) {
-        setProperty(key, value, false);
+    String getProperty(final PropertyKey key, final String defaultValue) {
+        return getConfiguration().getString(key.key, defaultValue);
     }
 
-    private void setProperty(final String key, final File value) {
-        setProperty(key, (value == null ? null : value.getAbsolutePath()), true);
+    int getInt(final PropertyKey key, final int defaultValue) {
+        return getConfiguration().getInt(key.key, defaultValue);
     }
 
-    private void setProperty(final String key, final Object value, final boolean definedKey) {
-        final String propertyKey;
-        if (definedKey) {
-            propertyKey = key;
-        } else {
-            propertyKey = generateKey(AS7, key);
-        }
+    long getLong(final PropertyKey key, final long defaultValue) {
+        return getConfiguration().getLong(key.key, defaultValue);
+    }
+
+    String[] getStringArray(final PropertyKey key) {
+        return getConfiguration().getStringArray(key.key);
+    }
+
+    void clearProperty(final PropertyKey key) {
+        getConfiguration().clearProperty(key.key);
+    }
+
+    void setProperty(final PropertyKey key, final File value) {
+        setProperty(key, (value == null ? null : value.getAbsolutePath()));
+    }
+
+    void setProperty(final PropertyKey key, final Object value) {
         if (value == null) {
-            getConfiguration().clearProperty(propertyKey);
+            getConfiguration().clearProperty(key.key);
         } else {
-            getConfiguration().setProperty(propertyKey, value);
+            getConfiguration().setProperty(key.key, value);
         }
     }
 
-    private File getFileResource(final String key) {
+    private File getFileResource(final PropertyKey key) {
         final Configuration configuration = getConfiguration();
-        return configuration.containsKey(key) ? new File(configuration.getString(key)) : null;
+        return configuration.containsKey(key.key) ? new File(configuration.getString(key.key)) : null;
     }
 
     private Configuration getConfiguration() {
         return configuration.getScopedConfiguration(ConfigurationScope.PROJECT);
-    }
-
-    private static String generateKey(final String... args) {
-        StringBuilder result = new StringBuilder(BASE);
-        for (String arg : args)
-            result = result.append(".").append(arg);
-        return result.toString();
     }
 }

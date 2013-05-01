@@ -61,7 +61,6 @@ import org.jboss.forge.shell.plugins.RequiresFacet;
  */
 @RequiresFacet(PackagingFacet.class)
 class AS7ServerFacet extends BaseFacet {
-    static final String PROJECT_KEY = "installed";
 
     @Inject
     private ProjectConfiguration configuration;
@@ -78,8 +77,11 @@ class AS7ServerFacet extends BaseFacet {
 
     @Override
     public boolean install() {
-        configuration.setProperty(PROJECT_KEY, "true");
-        return configuration.hasProperty(PROJECT_KEY);
+        if (isLegacyConfiguration()) {
+            convertLegacy();
+        }
+        configuration.setProperty(PropertyKey.PROJECT_KEY, true);
+        return configuration.hasProperty(PropertyKey.PROJECT_KEY);
     }
 
     @Override
@@ -90,7 +92,25 @@ class AS7ServerFacet extends BaseFacet {
 
     @Override
     public boolean isInstalled() {
-        return configuration.hasProperty(PROJECT_KEY);
+        if (isLegacyConfiguration()) {
+            return install();
+        }
+        return configuration.hasProperty(PropertyKey.PROJECT_KEY);
+    }
+
+    protected boolean isLegacyConfiguration() {
+        return configuration.hasProperty(PropertyKey.LEGACY_CONFIGURED);
+    }
+
+    protected void convertLegacy() {
+        if (configuration.hasProperty(PropertyKey.LEGACY_CONFIGURED)) {
+            if (configuration.getJbossHome() != null) {
+                configuration.setDefaultJbossHomeJbossHome();
+            }
+            // Clears the property
+            configuration.clearProperty(PropertyKey.LEGACY_CONFIGURED);
+        }
+        configuration.setProperty(PropertyKey.PROJECT_KEY, true);
     }
 
     ProjectConfiguration getConfiguration() {
